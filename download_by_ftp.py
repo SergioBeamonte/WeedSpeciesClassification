@@ -3,6 +3,11 @@ from pathlib import Path
 import pandas as pd
 import argparse
 from tqdm import tqdm
+import io
+import zipfile
+import shutil
+
+NUMBER_OF_FILES = 10
 
 def get_list_to_download(df, lst, column):
     df2 = df[df[column].isin(lst)]
@@ -10,17 +15,6 @@ def get_list_to_download(df, lst, column):
     df4 = df3["filename"].str.split("/", expand=True)
     to_download = list(df4[0] + "/" + df4[1] + ".zip")
     return to_download
-
-
-def download_file(save_path, folder, fname):
-    ftp = FTP('dataserv.ub.tum.de')
-    ftp.login('m1717366', 'm1717366')
-    save_file_path = save_path / folder / fname
-    save_file_path.parent.mkdir(exist_ok=True, parents=True)
-    if not save_file_path.is_file():
-        with open(save_file_path, 'wb') as f:
-            ftp.retrbinary('RETR ' + folder + "/" + fname, f.write)
-    return
 
 
 def download_gt_file(save_path):
@@ -60,6 +54,10 @@ def download_species(save_path, image_type, species):
     print(f"Downloading {species}...")
     df = pd.read_csv(save_path / "gt.csv")
     filenames = get_list_to_download(df, species, "label_id")
+
+    # Solo me quedo con unas cuantas
+    filenames = filenames[:NUMBER_OF_FILES]
+
     trange = tqdm(filenames, total=len(filenames))
     for fname in trange:
             download_file(save_path, image_type, fname)
@@ -78,10 +76,94 @@ def download_trays(save_path, image_type, trays):
             trange.set_description_str(image_type+"/"+fname)
     return
 
+def download_varied(save_path, image_type, dummy=None):
+    download_gt_file(save_path)
+    df = pd.read_csv(save_path / "gt.csv")
+    
+    # Agrupamos para no coger todas de la misma planta y asegurar variedad
+    df_unique = df.groupby(["label_id", "tray_id"]).first().reset_index()
+    
+    # Pillamos aleatorias 
+    df_sample = df_unique.sample(n=NUMBER_OF_FILES, random_state=42)
+    
+    df4 = df_sample["filename"].str.split("/", expand=True)
+    filenames = list(df4[0] + "/" + df4[1] + ".zip")
+    
+    trange = tqdm(filenames, total=NUMBER_OF_FILES)
+    for fname in trange:
+        download_file(save_path, image_type, fname)
+        trange.set_description_str(image_type+"/"+fname)
+    return
+
+
+def download_file(save_path, folder, fname):
+    ftp = FTP('dataserv.ub.tum.de')
+    ftp.login('m1717366', 'm1717366')
+    
+    # fname viene como "carpeta1/carpeta2.zip"
+    save_folder = Path(save_path) / folder
+    save_folder.mkdir(exist_ok=True, parents=True)
+    
+    # Creamos un espacio en la memoria RAM para el zip
+    zip_buffer = io.BytesIO()
+    
+    try:
+        # Descargamos el zip directamente a la RAM
+        ftp.retrbinary('RETR ' + folder + "/" + fname, zip_buffer.write)
+    except Exception as e:
+        print(f"\nError descargando {fname}: {e}")
+        return
+
+    try:
+        # Leemos el zip desde la RAM
+        with zipfile.ZipFile(zip_buffer, 'r') as zip_ref:
+            archivos = zip_ref.infolist()
+            
+            # Filtramos para ignorar carpetas, solo queremos archivos
+            archivos = [f for f in archivos if not f.is_dir()]
+            
+            if not archivos:
+                return
+
+            # Ordenamos alfabéticamente por el NOMBRE del archivo
+            archivos.sort(key=lambda x: x.filename)
+            
+            # Cogemos la penúltima (índice -2). Si por lo que sea solo hay 1 archivo, pillamos ese.
+            if len(archivos) >= 2:
+                target = archivos[-2]
+            else:
+                target = archivos[0] 
+                
+            # Extraemos SOLO ese archivo físicamente al disco duro
+            ruta_extraida = Path(zip_ref.extract(target, path=save_folder))
+            
+            # Forzamos que la ruta final sea directamente dentro de "jpegs" (o la carpeta principal)
+            ruta_final = save_folder / ruta_extraida.name
+            
+            # Si se ha extraído en una subcarpeta, la sacamos de ahí
+            if ruta_extraida != ruta_final:
+                # Nos cargamos el archivo destino si ya había algo para que shutil.move no tire error
+                if ruta_final.exists():
+                    ruta_final.unlink()
+                
+                shutil.move(str(ruta_extraida), str(ruta_final))
+                
+                # Intentamos borrar la carpeta vacía que deja atrás, si peta porque hay más mierda, pasamos olímpicamente
+                try:
+                    ruta_extraida.parent.rmdir()
+                except OSError:
+                    pass
+            
+    except zipfile.BadZipFile:
+        print(f"\nEl archivo {fname} está corrupto o vacío.")
+        
+    # Al terminar la función, 'zip_buffer' se elimina de la RAM automáticamente.
+    return
 
 FUNCTION_MAP = {'species': download_species,
                 'masks': download_all_files_with_segmentation_masks,
-                'trays': download_trays}
+                'trays': download_trays,
+                'varied': download_varied}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

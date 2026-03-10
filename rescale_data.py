@@ -64,40 +64,55 @@ def save_resized_image(image, save_path: Path, filename: str, suffix: str):
 
 
 if __name__ == "__main__":
-    data_path = Path("/data/MFWD/")
+    data_path = Path("./data") # Cámbialo a "./data" si es la ruta que estás usando ahora
     b_masks = True  # whether masks are present
     csv_path = data_path / "gt.csv"
     jpegs_path = data_path / "jpegs"
     new_shape = (514, 614)
-    save_path = data_path.parent / f"resized_{new_shape}"
+    
+    # 1. Creamos la nueva carpeta para todo
+    save_path = data_path / "small_jpegs"
     save_path.mkdir(parents=True, exist_ok=True)
+    
     df = pd.read_csv(csv_path)
     original_shape = (2056, 2454)
     resize_bounding_boxes(df, original_shape, new_shape)
     df.to_csv(f"{save_path}/gt.csv", index=False)  # save the csv file
-    for image_p in jpegs_path.glob("*/*/*.jpeg"):
-        save_img_path = save_path / "jpegs" / \
-            image_p.parent.parent.stem / image_p.parent.stem
-        save_img_path.mkdir(exist_ok=True, parents=True)
+    
+    # Usamos rglob para encontrar los jpegs estén sueltos o en subcarpetas
+    for image_p in jpegs_path.rglob("*.jpeg"):
+        
+        # 2. Guardamos la imagen reescalada directamente en small_jpegs
         img = skio.imread(image_p)
         image_resized = resize_image(img, new_shape, 0, False)
-        save_resized_image(image_resized, save_img_path,
-                           image_p.stem, suffix="jpeg")
+        save_resized_image(image_resized, save_path, image_p.stem, suffix="jpeg")
+        
+        # 3. Borramos la original pesada ("moverla")
+        image_p.unlink()
+        
         if b_masks:
-            save_msk_pan_path = save_path / "masks" / "panoptic_segmentation" / \
-                image_p.parent.parent.stem / image_p.parent.stem
-            save_msk_sem_path = save_path / "masks" / "semantic_segmentation" / \
-                image_p.parent.parent.stem / image_p.parent.stem
+            # 4. Ajustamos las rutas de las máscaras para que vayan a small_jpegs/masks/...
+            save_msk_pan_path = save_path / "masks" / "panoptic_segmentation"
+            save_msk_sem_path = save_path / "masks" / "semantic_segmentation"
+            
             save_msk_pan_path.mkdir(exist_ok=True, parents=True)
             save_msk_sem_path.mkdir(exist_ok=True, parents=True)
+            
             pan_ann_p = str(image_p).replace(
                 "jpegs", "masks/panoptic_segmentation").replace("jpeg", "png")
-            msk = skio.imread(pan_ann_p, as_gray=True)
-            msk_resized = resize_mask(msk, new_shape)
-            # semantic mask, if all instances are of the same class
-            msk_resized_sem = msk_resized > 1
-            msk_resized_sem = msk_resized_sem.astype(np.uint8)*255
-            save_resized_image(msk_resized, save_msk_pan_path,
-                               image_p.stem, suffix="png")
-            save_resized_image(
-                msk_resized_sem, save_msk_sem_path, image_p.stem, suffix="png")
+            
+            # Comprobamos que la máscara existe antes de intentar abrirla
+            if Path(pan_ann_p).exists():
+                msk = skio.imread(pan_ann_p, as_gray=True)
+                msk_resized = resize_mask(msk, new_shape)
+                # semantic mask, if all instances are of the same class
+                msk_resized_sem = msk_resized > 1
+                msk_resized_sem = msk_resized_sem.astype(np.uint8)*255
+                
+                save_resized_image(msk_resized, save_msk_pan_path,
+                                   image_p.stem, suffix="png")
+                save_resized_image(msk_resized_sem, save_msk_sem_path, 
+                                   image_p.stem, suffix="png")
+                
+                # Opcional: descomenta la línea de abajo si también quieres borrar la máscara original tras reescalarla
+                # Path(pan_ann_p).unlink()
