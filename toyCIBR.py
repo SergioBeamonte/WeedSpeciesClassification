@@ -143,11 +143,19 @@ class ToyCBIRSystem:
 if __name__ == "__main__":
     cbir = ToyCBIRSystem()
 
-    # Initial Indexing
-    cbir.index_folder("./data/small_jpegs") # Cambia a tu carpeta de imágenes
+    # 1. Intentamos cargar el índice guardado previamente
+    if not cbir.load_index():
+        print("Índice no encontrado. Extrayendo características y creando uno nuevo...")
+        # Solo indexa si load_index() devuelve False
+        cbir.index_folder("./data/small_jpegs") 
+        cbir.load_index() # Lo cargamos en memoria tras crearlo
+    else:
+        print("¡Índice cargado desde el disco instantáneamente!")
 
-    if cbir.load_index():
-        # query = "query.jpg" # check that query.jpg image exists 
-        if os.path.exists(query):
-            res = cbir.search(query, top_k=5)
-            cbir.visualize(query, res)
+    # 2. Búsqueda
+    query = "query.jpg" # Asegúrate de que esta variable esté definida
+    if os.path.exists(query):
+        res = cbir.search(query, top_k=5)
+        cbir.visualize(query, res)
+    else:
+        print(f"No se encontró la imagen de consulta: {query}")
