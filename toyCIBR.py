@@ -153,7 +153,7 @@ if __name__ == "__main__":
         print("¡Índice cargado desde el disco instantáneamente!")
 
     # 2. Búsqueda
-    query = "query.jpg" # Asegúrate de que esta variable esté definida
+    query = "data\\small_jpegs\\PULDY_114902_2021Y09M08D_12H32M43S_img.jpeg" # Asegúrate de que esta variable esté definida
     if os.path.exists(query):
         res = cbir.search(query, top_k=5)
         cbir.visualize(query, res)

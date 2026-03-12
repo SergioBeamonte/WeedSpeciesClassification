@@ -6,7 +6,7 @@ import io
 import zipfile
 import shutil
 
-NUMBER_OF_FILES = 20
+NUMBER_OF_FILES = 40
 
 def get_list_to_download(df, lst, column):
     df2 = df[df[column].isin(lst)]
@@ -112,7 +112,7 @@ def download_file(save_path, folder, fname):
             archivos.sort(key=lambda x: x.filename)
             
             if len(archivos) >= 2:
-                target = archivos[-2]
+                target = archivos[-1]
             else:
                 target = archivos[0] 
                 
