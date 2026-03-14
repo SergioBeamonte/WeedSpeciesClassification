@@ -6,7 +6,7 @@ import io
 import zipfile
 import shutil
 
-NUMBER_OF_FILES = 40
+NUMBER_OF_FILES = 200
 
 def get_list_to_download(df, lst, column):
     df2 = df[df[column].isin(lst)]
@@ -82,10 +82,10 @@ def download_file(save_path, folder, fname):
     if small_jpegs_dir.exists():
         # Comprobamos si los caracteres de la posición 6 a la 12 del archivo existente coinciden con el prefijo
         if any(f.name[6:12] == prefix for f in small_jpegs_dir.iterdir() if f.is_file()):
-            print(f"[SALTADO] Ya existe archivo coincidente con {prefix} en las posiciones 6-12 en small_jpegs", flush=True)
+            print(f"[SALTADO] Ya existe archivo {prefix}", flush=True)
             return
 
-    print(f"\n[DESCARGANDO] Zip: {fname} en la carpeta {folder}...", flush=True)
+    print(f"[DESCARGANDO] {fname}...", flush=True)
 
     ftp = FTP('dataserv.ub.tum.de')
     ftp.login('m1717366', 'm1717366')
