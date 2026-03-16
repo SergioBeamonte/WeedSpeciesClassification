@@ -57,7 +57,7 @@ python3 download_by_ftp.py trays '109801, 109802'
 ```
 **d) (New implementation) Downloads a fixed number (in the code) of random species at their last stage:**
 ```bash
-python3 download_by_ftp.py variety'
+python3 download_by_ftp.py variety
 ```
 *Possible arguments:* `save_path`, `files` (EPPO codes or tray IDs), `img_type` ('jpegs' or 'pngs').
 
