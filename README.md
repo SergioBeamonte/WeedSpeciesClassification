@@ -55,7 +55,7 @@ c) All images of multiple specific trays:
 ```bash
 python3 download_by_ftp.py trays '109801, 109802'
 ```
-**d) (New implementation) Downloads a fixed number (in the code) of random species at their last stage:**
+**d) (New implementation) Downloads a fixed number (specified in the code) of random species at their last stage:**
 ```bash
 python3 download_by_ftp.py variety
 ```
